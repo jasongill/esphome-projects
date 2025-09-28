@@ -1,3 +1,4 @@
 .esphome/
 .idea/
 secrets.yaml
+*/.gitignore

@@ -17,6 +17,7 @@ esphome:
     then:
       - component.update: axp
       - delay: 200ms
+
 esp32:
   board: m5stack-core2
   framework:
@@ -47,21 +48,52 @@ time:
     id: sntp_time
     timezone: America/New_York
 
+number:
+  - platform: template
+    id: dogs_get_hungry_after_hours
+    name: "Dogs Get Hungry After"
+    icon: mdi:timer-sand
+    unit_of_measurement: hours
+    min_value: 0
+    max_value: 24
+    step: 1
+    initial_value: '8'
+    restore_value: yes
+    optimistic: true
+  - platform: template
+    id: tilt_threshold
+    name: "Tilt Threshold"
+    unit_of_measurement: degrees
+    icon: mdi:axis-arrow
+    min_value: 0
+    max_value: 90
+    step: 1
+    initial_value: "20"
+    restore_value: yes
+    optimistic: true
+
 globals:
   - id: last_fed_epoch
     type: time_t
-    restore_value: 'yes'
+    restore_value: yes
     initial_value: '0'
 
 script:
   - id: mark_fed
     then:
-      - lambda: >-
+      - lambda: |-
           auto now = id(sntp_time).now();
-          if (!now.is_valid()) { ESP_LOGW("feed","No time; skip"); return; }
+          if (!now.is_valid()) {
+            ESP_LOGW("dogfood","Time not yet set, ignoring feeding");
+            return;
+          }
           if (id(last_fed_epoch) && (now.timestamp - id(last_fed_epoch)) < 60) {
-          ESP_LOGI("feed","Cooldown"); return; }
+            ESP_LOGI("dogfood","Feeding already recorded in last 60 seconds, ignoring feeding");
+            return;
+          }
+          ESP_LOGI("dogfood","Feeding recorded");
           id(last_fed_epoch) = now.timestamp;
+      - component.update: last_fed_epoch_sensor
 
 spi:
   clk_pin: GPIO18
@@ -73,18 +105,17 @@ i2c:
     scl: GPIO22
     scan: true
     frequency: 400kHz
+
 sensor:
   - platform: template
-    name: Time Since Dogs Were Fed
-    id: minutes_since_fed
-    unit_of_measurement: min
-    accuracy_decimals: 0
+    id: last_fed_epoch_sensor
+    name: "Dogs Last Fed"
+    device_class: timestamp
     icon: mdi:dog
     update_interval: 60s
     lambda: |-
-      auto now = id(sntp_time).now();
-      if (!now.is_valid() || id(last_fed_epoch) == 0) return NAN;
-      return (now.timestamp - id(last_fed_epoch)) / 60.0f;
+      if (id(last_fed_epoch) == 0) return NAN;
+      return (float) id(last_fed_epoch);
   - platform: mpu6886
     address: 104
     update_interval: 200ms
@@ -130,7 +161,6 @@ display:
     model: ili9342
     cs_pin: GPIO5
     dc_pin: GPIO15
-    reset_pin: GPIO33
     invert_colors: true
     show_test_card: false
     dimensions:
@@ -140,24 +170,29 @@ display:
       mirror_x: false
     update_interval: 1s
     lambda: |-
+      auto textcolor = Color::WHITE; 
       it.fill(Color::BLACK);
       auto now = id(sntp_time).now();
       if (id(last_fed_epoch) != 0 && now.is_valid()) {
         const uint32_t diff = now.timestamp - id(last_fed_epoch);
         const int h = (diff % 86400) / 3600, m = (diff % 3600) / 60, s = diff % 60;
-        it.printf(160,20, id(font_md), TextAlign::TOP_CENTER, "Dogs Last Fed");
-        it.printf(160,80, id(font_lg), TextAlign::TOP_CENTER, "%dh %dm %ds", h, m, s);
+        if (id(dogs_are_hungry).state) {
+          textcolor = Color::BLACK;
+          it.fill(Color(255, 0, 0));
+        }
+        it.printf(160,20, id(font_md), textcolor, TextAlign::TOP_CENTER, "Dogs Last Fed");
+        it.printf(160,80, id(font_lg), textcolor, TextAlign::TOP_CENTER, "%dh %dm %ds", h, m, s);
         auto fed_time = ESPTime::from_epoch_local(id(last_fed_epoch));
         char fed_buf[32];
         fed_time.strftime(fed_buf, sizeof(fed_buf), "%I:%M %p");
         if (fed_buf[0] == '0') {
           memmove(fed_buf, fed_buf + 1, strlen(fed_buf));
         }
-        it.printf(160,140, id(font_md), TextAlign::TOP_CENTER, "%s", fed_buf);
+        it.printf(160,140, id(font_md), textcolor, TextAlign::TOP_CENTER, "%s", fed_buf);
       }
       if (id(battery_level).has_state() && (int)id(battery_level).state < 100) {
-        it.printf(160, 210, id(font_sm), TextAlign::TOP_CENTER, "%d%%", (int)id(battery_level).state);
-        it.printf(190, 208, id(emoji_sm), COLOR_ON, TextAlign::TOP_CENTER, "🔋", COLOR_OFF);
+        it.printf(160, 210, id(font_sm), textcolor, TextAlign::TOP_CENTER, "%d%%", (int)id(battery_level).state);
+        it.printf(190, 208, id(emoji_sm), textcolor, TextAlign::TOP_CENTER, "🔋");
       }
 
 external_components:
@@ -169,24 +204,35 @@ binary_sensor:
     id: lid_lifted
     device_class: opening
     lambda: |-
-      if (!id(accel_x).has_state() || !id(accel_y).has_state() || !id(accel_z).has_state()) {
+      if (!(id(accel_x).has_state() && id(accel_y).has_state() && id(accel_z).has_state()))
         return false;
-      }
+    
       const float ax = id(accel_x).state;
       const float ay = id(accel_y).state;
       const float az = id(accel_z).state;
-
-      // Normalize to g vector
-      const float gmag = sqrtf(ax*ax + ay*ay + az*az);
-      if (gmag < 1.0f) return false;  // sanity check
-
-      const float nz = az / gmag;  // cosine of angle to vertical
-      const float angle = acosf(nz) * 180.0f / 3.14159f;  // degrees
-
-      // Trigger if tilted more than 30° from vertical
-      return angle > 20.0f;
+      const float g  = sqrtf(ax*ax + ay*ay + az*az);
+      if (g < 1.0f) return false;
+    
+      const float thresh_deg = id(tilt_threshold).state;
+      const float cos_t = cosf(thresh_deg * 0.0174532925f);
+      const float g_cos_t = g * cos_t;
+    
+      return fabsf(ax) < g_cos_t ||
+             fabsf(ay) < g_cos_t ||
+             fabsf(az) < g_cos_t;
     filters:
-      - delayed_on: 500ms   # require sustained tilt
+      - delayed_on: 500ms
       - delayed_off: 2s
     on_press:
       - script.execute: mark_fed
+  - platform: template
+    id: dogs_are_hungry
+    name: "Dogs Are Hungry"
+    lambda: |-
+      auto now = id(sntp_time).now();
+      if (id(last_fed_epoch) != 0 && now.is_valid()) {
+        const uint32_t diff = now.timestamp - id(last_fed_epoch);
+        const int h = (diff % 86400) / 3600;
+        return h >= id(dogs_get_hungry_after_hours).state;
+      }
+      return false;

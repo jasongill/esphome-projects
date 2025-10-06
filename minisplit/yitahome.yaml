@@ -15,6 +15,7 @@ debug:
 
 logger:
   level: INFO
+  baud_rate: 0
 
 api:
 
@@ -41,11 +42,6 @@ climate:
   - platform: aux_ac
     name: "Mini Split"
     id: aux_id
-    period: 7s
-    show_action: true
-    display_inverted: false
-    timeout: 150
-    optimistic: true
     indoor_temperature:
       name: AC Indoor Temperature
       id: ac_indoor_temp

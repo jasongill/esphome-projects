@@ -8,6 +8,7 @@ esp8266:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  # ap: {} # connect to the minisplit-XXXXX wifi network and then visit http://192.168.4.1 to set your wifi credentials
 
 captive_portal:
 

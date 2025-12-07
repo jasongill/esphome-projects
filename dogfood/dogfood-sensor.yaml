@@ -134,17 +134,19 @@ font:
     glyphs: "🔋"
 
 display:
-  - platform: ili9xxx
-    model: ili9342
+  - platform: mipi_spi
+    model: ILI9341
     cs_pin: GPIO5
     dc_pin: GPIO15
     invert_colors: true
-    show_test_card: false
     dimensions:
       width: 320
       height: 240
     transform:
       mirror_x: false
+      mirror_y: false
+      swap_xy: false
+    data_rate: 40MHz
     update_interval: 1s
     lambda: |-
       auto textcolor = Color::WHITE; 

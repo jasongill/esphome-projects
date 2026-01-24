@@ -11,7 +11,7 @@ esphome:
         - -DgetDC4LowVoltagePowerDowmEn=getDC4LowVoltagePowerDownEn
         - -DgetDC5LowVoltagePowerDowmEn=getDC5LowVoltagePowerDownEn
   libraries:
-    - lewisxhe/XPowersLib @ ^0.2.6
+    - XPowersLib
   on_boot:
     priority: 900
     then:
@@ -27,8 +27,6 @@ esp32:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-
-debug:
 
 captive_portal:
 

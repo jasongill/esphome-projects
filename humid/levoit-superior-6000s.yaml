@@ -1,0 +1,180 @@
+esphome:
+  name: levoit-superior-6000s
+  name_add_mac_suffix: true
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+
+captive_portal:
+
+debug:
+
+logger:
+  level: INFO
+  baud_rate: 0
+
+api:
+
+web_server:
+  port: 80
+
+ota:
+  - platform: esphome
+
+uart:
+  id: uart_mcu2esp
+  rx_pin: GPIO18
+  tx_pin: GPIO19
+  baud_rate: 115200
+
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [levoit]
+
+levoit:
+  id: levoit_id
+  model: SUPERIOR6000S
+
+fan:
+  - platform: levoit
+    levoit: levoit_id
+    name: "Fan"
+    id: levoit_fan1
+
+switch:
+  - platform: levoit
+    levoit: levoit_id
+    name: "Display"
+    type: display
+    icon: mdi:brightness-7
+  - platform: levoit
+    levoit: levoit_id
+    name: "Child Lock"
+    type: child_lock
+    icon: mdi:lock-outline
+  - platform: levoit
+    levoit: levoit_id
+    name: "Auto Dry (Power Off)"
+    type: auto_dry_power_off
+    icon: mdi:fan-auto
+  - platform: levoit
+    levoit: levoit_id
+    name: "Auto Dry (Water Empty)"
+    type: auto_dry_water_empty
+    icon: mdi:fan-auto
+
+number:
+  # Hours, 0 = off. The ESP runs this countdown itself — see the README.
+  - platform: levoit
+    levoit: levoit_id
+    name: "Timer"
+    type: timer
+    icon: mdi:timer-outline
+  - platform: levoit
+    levoit: levoit_id
+    name: "Humidity Target"
+    type: humidity_target
+    icon: mdi:water-percent
+  - platform: levoit
+    levoit: levoit_id
+    name: "Filter Months"
+    type: filter_lifetime_months
+
+sensor:
+  - platform: levoit
+    levoit: levoit_id
+    name: "Humidity"
+    type: humidity
+    device_class: humidity
+    state_class: measurement
+    unit_of_measurement: "%"
+  - platform: levoit
+    levoit: levoit_id
+    name: "Temperature"
+    type: temperature
+    device_class: temperature
+    state_class: measurement
+    unit_of_measurement: "°C"
+  - platform: levoit
+    levoit: levoit_id
+    name: "Filter Life (MCU)"
+    type: filter_life_mcu
+  - platform: levoit
+    levoit: levoit_id
+    name: "Filter Life %"
+    type: filter_life_left
+  - platform: levoit
+    levoit: levoit_id
+    name: "Timer Remaining"
+    type: timer_current
+
+select:
+  - platform: levoit
+    levoit: levoit_id
+    name: "Auto Profile"
+    type: auto_profile
+    icon: mdi:home-account
+  - platform: levoit
+    levoit: levoit_id
+    name: "Humidity Mode"
+    type: humidity_subtype
+    icon: mdi:water-percent
+  # Remembered only — applied when Dry mode is selected on the fan entity.
+  - platform: levoit
+    levoit: levoit_id
+    name: "Dry Level"
+    type: dry_level
+    icon: mdi:air-filter
+
+text_sensor:
+  - platform: levoit
+    levoit: levoit_id
+    name: "MCU Version"
+    type: mcu_version
+  - platform: levoit
+    levoit: levoit_id
+    name: "ESP Version"
+    type: esp_version
+
+binary_sensor:
+  - platform: levoit
+    levoit: levoit_id
+    name: "Filter State"
+    type: filter_low
+  - platform: levoit
+    levoit: levoit_id
+    name: "Cover State"
+    type: cover_open
+    icon: mdi:window-open
+  - platform: levoit
+    levoit: levoit_id
+    name: "Water Level"
+    type: water_tank_empty
+    icon: mdi:waves-arrow-up
+  - platform: levoit
+    levoit: levoit_id
+    name: "Drying"
+    type: dry_active
+    icon: mdi:air-filter
+  - platform: levoit
+    levoit: levoit_id
+    name: "Humidifying"
+    type: humidifying
+    icon: mdi:water
+
+button:
+  - platform: levoit
+    levoit: levoit_id
+    name: "Filter Reset"
+    type: reset_filter_stats

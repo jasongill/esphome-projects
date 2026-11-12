@@ -1,0 +1,34 @@
+Vendored from https://github.com/tuct/levoit
+Base revision: 72c0201e94233017d0ff3e16035aff8348a54af5
+
+Superior 6000S controls patch, 2026-10-28:
+- Expose nine speeds and Manual/Sleep/Auto/Humidity/Dry; exclude Pet.
+- Decode Humidity and Dry presets already supplied by superior_status.cpp.
+- Expose Home/Away, Smart/Fan, and Low/High select options.
+- Keep optional fan operating mode select mappings consistent.
+- A speed request with no explicit preset selects Manual even when the
+  previous preset is unknown and the requested speed is unchanged.
+
+6000S capability/option mappings follow Jyers/levoit-esphome revision
+9ecc7e6a (fan and select implementations). Retains tuct's current ESPHome API,
+power-status decoding, temperature handling and command encoding.
+
+This patch adds no humidity automation and does not change boot behavior.
+
+Power/command repair, 2026-11-09 (verified with MCU 1.0.9):
+- Route SUPERIOR6000S through build_superior_command in sendCommand. The
+  upstream dispatcher omitted this model entirely, so commands were dropped.
+- Decode power from status TLV 0x02, not 0x00 (constant device ID).
+  Captured 0x00=1 with 0x02=0 after off, and 0x02=1 when on/drying.
+- Publish Superior power only from MCU reports; always transmit an explicit
+  power request so a lost command can be retried.
+- Decode every Superior report instead of deduplicating with an 8-bit hash.
+- Send mode before speed when both are requested; Manual restores the MCU's
+  remembered speed, which otherwise overwrote speed 1 with speed 5 in testing.
+- Hardware tests confirmed real power-on and Humidifying ON. Auto-dry settings
+  had to be sent again after repairing dispatch (previous writes were dropped).
+- Final firmware verified MCU power ON + Manual speed 1 + Humidifying ON,
+  followed by MCU power OFF + Humidifying OFF + Drying OFF after full-off.
+
+To revert, restore the YAML external_components git source to tuct/levoit
+at the base revision above, rebuild and upload.

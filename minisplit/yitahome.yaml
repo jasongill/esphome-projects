@@ -37,7 +37,7 @@ uart:
 external_components:
   - source:
       type: git
-      url: https://github.com/GrKoR/esphome_aux_ac_component
+      url: https://github.com/jasongill/esphome_aux_ac_component
 
 climate:
   - platform: aux_ac
@@ -91,6 +91,10 @@ climate:
     vlouver_state:
       name: AC Vertical Louvers State
       id: ac_vlouver_state
+      internal: false
+    actual_fan_speed:                                                                                  
+      name: AC Actual Fan Speed                                                                        
+      id: ac_actual_fan_speed                                                                          
       internal: false
     visual:
       min_temperature: "60 °F"
